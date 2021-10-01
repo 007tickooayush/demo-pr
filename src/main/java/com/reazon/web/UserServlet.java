@@ -1,19 +1,19 @@
-package main.webapp.web;
+package com.reazon.web;
 
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 
-import java.io.IOException;
-import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import main.webapp.dao.UserDAO;
-import main.webapp.model.User;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.reazon.dao.UserDAO;
+import com.reazon.model.User;
 
 /**
  * Servlet implementation class UserServlet
@@ -21,134 +21,158 @@ import main.webapp.model.User;
 @WebServlet("/")
 public class UserServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-    private UserDAO userDao;
-    
+    private UserDAO userDAO;
+    private Gson gson;
     /**
      * @see HttpServlet#HttpServlet()
      */
     public UserServlet() {
-        this.userDao = new UserDAO();
+       userDAO = new UserDAO();
     }
 
-    /**
-	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
-	 */
-	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		this.doGet(request, response);
-	}
-    
 	/**
 	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
 	 */
+//    :::::::::::::::::::API CALLBACKs:::::::::::::::::::
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+//		response.getWriter().append("{response: \"Use POST request instead of GET\"}");
 		
 		String action = request.getServletPath();
+		try {
+			switch(action) {
+			case "/home":
+				showAllUsers(request, response);
+				break;
+			case "/user":
+				getUserById(request, response);
+				break;
+			default:
+				showAllUsers(request, response);
+				break;
+			}
+		} catch (SQLException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+	 */
+	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		// TODO Auto-generated method stub
+		try {
+			insertUser(request, response);
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException,IllegalStateException {
 		
-		switch(action) {
-		case "/new":
-			showNewForm(request, response);
-			break;
-		case "/insert":
-			try {
-				insertUser(request, response);
-			} catch (IOException | SQLException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+		try {
+			
+			String action = req.getServletPath();
+			
+			switch(action) {
+			case "/duser":
+				deleteUser(req, resp);
+				break;
 			}
-			break;
-		case "/delete":
-			try {
-				deleteUser(request, response);
-			} catch (ServletException | IOException | SQLException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	
+	protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		
+		try {
+			
+			String action = req.getServletPath();
+			
+			switch(action) {
+			case "/user":
+				updateUser(req, resp);
+				break;
 			}
-			break;
-		case "/edit":
-			try {
-				showEditForm(request, response);
-			} catch (SQLException | ServletException | IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			break;
-		case "/update":
-			try {
-				updateUser(request, response);
-			} catch (SQLException | IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			break;
-		default:
-//			provide user list by default
-			try {
-				listUser(request, response);
-			} catch (SQLException | IOException | ServletException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			break;
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		
 	}
+//	X:::::::::::::::::::API CALLBACKs:::::::::::::::::::X
+	
+	
+//	:::::::::::::::::::AUXILLARY FUNCTIONS::::::::::::::::::: 
+	private void insertUser(HttpServletRequest req,HttpServletResponse resp) throws SQLException, IOException {
+		String name = req.getParameter("name");
+		String email = req.getParameter("email");
+		String country = req.getParameter("country");
+		
+		userDAO.insertUser(new User(name,email,country));
+		
+		resp.getWriter().append("DATA INSERTED");
+		resp.sendRedirect("home");
+		
+	}
+	
+	private void showAllUsers(HttpServletRequest req,HttpServletResponse resp) throws SQLException, IOException {
+		List<User> users = userDAO.selectAllUsers();
+		
+		gson = new Gson();
+		
+		String json = gson.toJson(users);
+		resp.setContentType("application/json");
+		resp.getWriter().write(json);
+				
+	}
 
-//	LIST page (users list page)
-	private void listUser(HttpServletRequest request,HttpServletResponse response) throws SQLException, IOException, ServletException {
-		List<User> listUser = userDao.selectAllUsers();
-		request.setAttribute("listUser", listUser);
-		RequestDispatcher dispatcher = request.getRequestDispatcher("user-list.jsp");
-		dispatcher.forward(request, response);
+	private void deleteUser(HttpServletRequest req,HttpServletResponse resp) throws SQLException, IOException {
+		int id = Integer.parseInt(req.getParameter("id"));
+		
+		userDAO.deleteUser(id);
+		
+		resp.sendRedirect("home");
+		
 	}
 	
-//	UPDATE user
-	private void updateUser(HttpServletRequest request,HttpServletResponse response) throws SQLException, IOException {
+	private void getUserById(HttpServletRequest req,HttpServletResponse resp) throws SQLException, IOException {
+		int id = Integer.parseInt(req.getParameter("id"));
+		User user = userDAO.getUserByID(id);
 		
-		int id = Integer.parseInt(request.getParameter("id"));
-		String name = request.getParameter("name");
-		String email = request.getParameter("email");
-		String country = request.getParameter("country");
+		gson = new Gson();
 		
-		User user = new User(id,name,email,country);
-		
-		userDao.updateUser(user);
-		response.sendRedirect("list");
+		String json = gson.toJson(user);
+		resp.setContentType("application/json");
+		resp.getWriter().print(json);
+				
 	}
 	
-//	OPEN form to EDIT existing user
-	private void showEditForm(HttpServletRequest request, HttpServletResponse response)
-		    throws SQLException, ServletException, IOException {
-		        int id = Integer.parseInt(request.getParameter("id"));
-		        User existingUser = userDao.selectUser(id);
-		        RequestDispatcher dispatcher = request.getRequestDispatcher("user-form.jsp");
-		        request.setAttribute("user", existingUser);
-		        dispatcher.forward(request, response);
-	}
-	
-//	DELETE user
-	private void deleteUser(HttpServletRequest request,HttpServletResponse response) throws ServletException, IOException, SQLException {
-		int id = Integer.parseInt(request.getParameter("id"));
-		userDao.deleteUser(id);
-//		redirect to users list page
-		response.sendRedirect("list");
-	}
-	
-//	OPEN user form JSP page to create new user
-	private void showNewForm(HttpServletRequest request,HttpServletResponse response) throws ServletException, IOException {
-		RequestDispatcher dispatcher = request.getRequestDispatcher("user-form.jsp");
-		dispatcher.forward(request, response);
-	}
-	
-// INSERT new user
-	private void insertUser(HttpServletRequest request,HttpServletResponse response) throws ServletException, IOException, SQLException {
-		String name = request.getParameter("name");
-		String email = request.getParameter("email");
-		String country = request.getParameter("country");
+	private void updateUser(HttpServletRequest req,HttpServletResponse resp) throws SQLException, IOException {
+		int id = Integer.parseInt(req.getParameter("id"));
+		String name = req.getParameter("name");
+		String email = req.getParameter("email");
+		String country = req.getParameter("country");
 		
-		User newUser = new User(name,email,country);
-		userDao.insertUser(newUser);
+		User existingUser = new User(id,
+				name,
+				email,
+				country
+				);
+		userDAO.updateUser(existingUser);
 		
-		response.sendRedirect("list");
+		gson = new Gson();
 		
+//		UPDATED [User]
+		String json = gson.toJson(existingUser);
+		resp.setContentType("application/json");
+		resp.getWriter().print(json);
 	}
+//	X:::::::::::::::::::AUXILLARY FUNCTIONS:::::::::::::::::::X
 }
